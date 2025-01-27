@@ -14,7 +14,7 @@ from langchain_core.tools import InjectedToolArg
 from typing_extensions import Annotated
 
 from react_agent.configuration import Configuration
-from vector_store_manager import vector_store_manager
+from react_agent.retriever import vector_store_manager
 
 
 async def search(
