@@ -14,6 +14,7 @@ from langchain_core.tools import InjectedToolArg
 from typing_extensions import Annotated
 
 from react_agent.configuration import Configuration
+from vector_store_manager import vector_store_manager
 
 
 async def search(
@@ -30,5 +31,17 @@ async def search(
     result = await wrapped.ainvoke({"query": query})
     return cast(list[dict[str, Any]], result)
 
+async def retrieve(
+    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
+) -> str:
+    """Retrieve semantically similar documents from the vector store.
 
-TOOLS: List[Callable[..., Any]] = [search]
+    This tool is designed to fetch relevant documents based on semantic similarity,
+    useful for answering domain-specific or context-aware questions.
+    """
+    retriever = vector_store_manager.get_retriever()
+    results = retriever.invoke(query)
+    return "\n\n".join(doc.page_content for doc in results)
+
+
+TOOLS: List[Callable[..., Any]] = [search,retrieve]
