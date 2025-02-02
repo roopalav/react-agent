@@ -20,7 +20,10 @@ dependencies = [
     "chromadb>=0.6.3",
     "pypdf>=5.2.0",
     "docx2txt>=0.8",
-    "playwright>=1.49.1"
+    "playwright>=1.49.1",
+    "beautifulsoup4",
+    "pandas",
+    "requests"
 ]
 
 
