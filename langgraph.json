@@ -1,7 +1,8 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "agent": "./src/react_agent/graph.py:graph"
+    "agent": "./src/react_agent/graph.py:graph",
+    "summarization": "./src/react_agent/summarize.py:summarize"
   },
   "env": ".env"
 }
