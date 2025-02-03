@@ -9,7 +9,7 @@ consider implementing more robust and specialized tools tailored to your needs.
 from typing import Any, Callable, List, Optional, cast
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import InjectedToolArg,Tool
+from langchain_core.tools import InjectedToolArg, Tool
 from typing_extensions import Annotated
 from react_agent.configuration import Configuration
 from react_agent.retriever import vector_store_manager
@@ -20,7 +20,8 @@ from react_agent.utils import load_cache, save_cache
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
 
-structured_prompt = PromptTemplate.from_template("""
+structured_prompt = PromptTemplate.from_template(
+    """
 You are a structured assistant. Format the following response according to its type (table, list, or paragraph).
 
 ### {title}
@@ -51,8 +52,7 @@ Examples:
 After the output, include the source link(s) where the information was obtained.
 
 **Source(s):**
-- [Source Link 1](url1)
-- [Source Link 2](url2)
+{sources}
 
 If the results include tweets, format them as follows:
 1. For **multiple tweets**, present them in a list format (as shown in the list example).
@@ -62,17 +62,21 @@ Example output with tweets:
 
 - **Tweet 1**: Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai, Date: 2025-02-02
 - **Tweet 2**: Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu, Date: 2025-02-03                                                                                                  
-""")
+"""
+)
+
 
 def format_response(input_data: dict) -> str:
     """Formats responses into structured headings and bullet points."""
     return structured_prompt.format(**input_data)
 
+
 format_tool = Tool(
     name="format_response_tool",
     func=format_response,
-    description="Formats responses into structured headings and bullet points for better readability."
+    description="Formats responses into structured headings and bullet points for better readability.",
 )
+
 
 async def search(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
@@ -85,15 +89,30 @@ async def search(
     """
     configuration = Configuration.from_runnable_config(config)
     wrapped = TavilySearchResults(max_results=configuration.max_search_results)
-    params={"query": query,
-            "search_depth": "advanced",
-            "include_domains": ["mausam.imd.gov.in","aws.imd.gov.in","beta-tnsmart.rimes.int"],
-            "exclude_domains": ["weatherapi.com","weathertab.com","weather2travel.com","world-weather.info",
-                                "weather-atlas.com","weather25","en.climate-data.org","wisemeteo.com","easeweather.com"]
-            }
+    params = {
+        "query": query,
+        "search_depth": "advanced",
+        "include_domains": [
+            "mausam.imd.gov.in",
+            "aws.imd.gov.in",
+            "beta-tnsmart.rimes.int",
+        ],
+        "exclude_domains": [
+            "weatherapi.com",
+            "weathertab.com",
+            "weather2travel.com",
+            "world-weather.info",
+            "weather-atlas.com",
+            "weather25",
+            "en.climate-data.org",
+            "wisemeteo.com",
+            "easeweather.com",
+        ],
+    }
     result = await wrapped.ainvoke(params)
-    #result = await wrapped.ainvoke({"query": query,"include_domains": ["mausam.imd.gov.in","aws.imd.gov.in","beta-tnsmart.rimes.int"]})
+    # result = await wrapped.ainvoke({"query": query,"include_domains": ["mausam.imd.gov.in","aws.imd.gov.in","beta-tnsmart.rimes.int"]})
     return cast(list[dict[str, Any]], result)
+
 
 async def retrieve(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
@@ -107,13 +126,13 @@ async def retrieve(
     results = retriever.invoke(query)
     return "\n\n".join(doc.page_content for doc in results)
 
-async def twitter_search_tool(
-    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
-) -> str:
+
+async def twitter_search_tool(query: str) -> str:
     """Fetches recent tweets based on the query.
 
     Uses the Twitter API to search for recent tweets and caches them to avoid duplication.
     """
+    # configuration = Configuration.from_runnable_config(config)
     load_dotenv()
     bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
     if not bearer_token:
@@ -127,7 +146,7 @@ async def twitter_search_tool(
         "tweet.fields": "id,created_at,author_id,text,geo",
         "expansions": "geo.place_id",
         "place.fields": "full_name,country",
-        "user.fields": "location"
+        "user.fields": "location",
     }
 
     response = requests.get(url, headers=headers, params=params)
@@ -136,7 +155,10 @@ async def twitter_search_tool(
 
     tweets = response.json().get("data", [])
     places = {p["id"]: p for p in response.json().get("includes", {}).get("places", [])}
-    users = {user["id"]: user for user in response.json().get("includes", {}).get("users", [])}
+    users = {
+        user["id"]: user
+        for user in response.json().get("includes", {}).get("users", [])
+    }
     if not tweets:
         return "No tweets found."
 
@@ -148,16 +170,18 @@ async def twitter_search_tool(
 
     # Update cache if there are new tweets
     if new_tweets:
-        cache.setdefault("twitter", {}).update({tweet["id"]: tweet for tweet in new_tweets})
+        cache.setdefault("twitter", {}).update(
+            {tweet["id"]: tweet for tweet in new_tweets}
+        )
         save_cache(cache)
 
-    all_tweets = list(existing_tweets.values()) + new_tweets    
+    all_tweets = list(existing_tweets.values()) + new_tweets
 
     formatted_tweets = []
     for tweet in all_tweets:
         place_info = "Location: Unknown"
         user_location = users.get(tweet["author_id"], {}).get("location", "Unknown")
-        
+
         # If tweet geo information is available, use that
         if tweet.get("geo"):
             place_id = tweet["geo"]["place_id"]
@@ -172,4 +196,5 @@ async def twitter_search_tool(
 
     return "\n\n".join(formatted_tweets)
 
-TOOLS: List[Callable[..., Any]] = [search,retrieve,format_tool]
+
+TOOLS: List[Callable[..., Any]] = [search, retrieve, format_tool]
