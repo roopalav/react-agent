@@ -23,7 +23,8 @@ dependencies = [
     "playwright>=1.49.1",
     "beautifulsoup4",
     "pandas",
-    "requests"
+    "requests",
+    "httpx"
 ]
 
 

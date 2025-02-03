@@ -23,9 +23,9 @@ import httpx
 
 structured_prompt = PromptTemplate.from_template(
     """
-You are a structured assistant. Format the following response according to its type (table, list, or paragraph).
+You are a structured assistant. Format the following response according to its type (table, list, or paragraph or any).
 
-### {title}
+### Add meaningful title
 
 {content}
 
@@ -33,11 +33,11 @@ If the response contains tabular data, present it as a table with proper column 
 
 If the response contains multiple points, present them as bullet points or a numbered list, depending on context.
 
-Ensure the response is **clear, concise, and easy to read**.
+Ensure the response is **clear and easy to read**.
 
 Examples:
 
-1. For **tabular data**:
+1. For tabular data:
     +------------+----------------+---------------+---------------+---------------+
     | Date       | Condition      | Max Temp (°C) | Min Temp (°C) | Rainfall (mm) |
     +------------+----------------+---------------+---------------+---------------+
@@ -46,12 +46,12 @@ Examples:
     | 2025-02-03 | Partly Cloudy  | 32            | 22            | 0.0           |
     +------------+----------------+---------------+---------------+---------------+
    
-2. For **a list**:
+2. For a list:
    - Point 1
    - Point 2
    - Point 3
 
-3. For **a paragraph**:
+3. For a paragraph:
    The latest weather report shows **Misty Haze** for February 2, 2025, with temperatures reaching 32°C, which is expected to stay consistent into February 3, 2025. No significant rainfall is expected in this region.
 
 If the results include tweets, format them as follows:
@@ -61,18 +61,18 @@ If the results include tweets, format them as follows:
 
 ### Example output with tweets:
 
-- **Tweet 1**: Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai, Date: 2025-02-02
-- **Tweet 2**: Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu, Date: 2025-02-03
+- **Tweet 1**:Date: 2025-02-02, Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai 
+- **Tweet 2**:Date: 2025-02-03, Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu
 
 After the output, include the source link(s) where the information was obtained.
 
-**Source(s):**
+**Source(s)**:
 - [Source Link 1](url1)
 - [Source Link 2](url2)
 
 If the content is from internal sources (retriever or similar), mark it as **Internal Source**.
 
-**Source(s):**
+**Source(s)**:
 - [Internal Source](internal-source-url) (Internal Source)
 
 """
@@ -81,7 +81,9 @@ If the content is from internal sources (retriever or similar), mark it as **Int
 
 def format_response(input_data: dict) -> str:
     """Formats responses into structured headings and bullet points."""
-    return structured_prompt.format(**input_data)
+    content = input_data.get("content", "")
+    return structured_prompt.format(content=content)
+    # return structured_prompt.format(**input_data)
 
 
 format_tool = Tool(
@@ -103,9 +105,7 @@ async def search(
     url = "https://api.tavily.com/search"
 
     params = {
-        "api_key": tavily_key,
         "query": query,
-        "search_depth": "advanced",
         "include_domains": [
             "mausam.imd.gov.in",
             "aws.imd.gov.in",
@@ -123,16 +123,43 @@ async def search(
             "wisemeteo.com",
             "easeweather.com",
         ],
-        "max_results": 5,
+        "count": 5,
+    }
+
+    headers = {
+        "Content-Type": "application/json",  # Ensure correct content type if required
+        "Authorization": tavily_key,  # If authentication is needed
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
+        response = await client.post(url, params=params, headers=headers)
 
+        # Check if the response is successful
         if response.status_code == 200:
-            return response.json().get("results", [])  # Extract only results
+            # Parse the JSON response
+            data = response.json()
+
+            # Ensure the "results" key exists
+            if "results" in data:
+                results = []
+                for result in data["results"]:
+                    url = result.get(
+                        "url", "No URL found"
+                    )  # Extract the URL if available
+                    content = result.get(
+                        "content", "No content found"
+                    )  # Extract the content if available
+                    results.append(
+                        {"url": url, "content": content}
+                    )  # Store as dictionary
+                return results
+            else:
+                raise Exception("No 'results' key found in the response.")
         else:
-            return [{"error": f"Failed to fetch results: {response.status_code}"}]
+            # Raise an exception if the request fails
+            raise Exception(
+                f"Failed to fetch results: {response.status_code}, {response.text}"
+            )
 
 
 async def search_old(
