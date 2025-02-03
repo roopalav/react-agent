@@ -19,6 +19,7 @@ from typing import Any, Callable, List, Optional, cast
 from react_agent.utils import load_cache, save_cache
 from langchain_core.prompts import PromptTemplate
 from dotenv import load_dotenv
+import httpx
 
 structured_prompt = PromptTemplate.from_template(
     """
@@ -35,7 +36,8 @@ If the response contains multiple points, present them as bullet points or a num
 Ensure the response is **clear, concise, and easy to read**.
 
 Examples:
-1. For tabular data:                                                  
+
+1. For **tabular data**:
     +------------+----------------+---------------+---------------+---------------+
     | Date       | Condition      | Max Temp (°C) | Min Temp (°C) | Rainfall (mm) |
     +------------+----------------+---------------+---------------+---------------+
@@ -44,24 +46,35 @@ Examples:
     | 2025-02-03 | Partly Cloudy  | 32            | 22            | 0.0           |
     +------------+----------------+---------------+---------------+---------------+
    
-2. For a list:
+2. For **a list**:
    - Point 1
    - Point 2
    - Point 3
 
+3. For **a paragraph**:
+   The latest weather report shows **Misty Haze** for February 2, 2025, with temperatures reaching 32°C, which is expected to stay consistent into February 3, 2025. No significant rainfall is expected in this region.
+
+If the results include tweets, format them as follows:
+
+- For **multiple tweets**, present them in a list format (as shown in the list example).
+- For **a single tweet**, summarize the tweet’s content in a paragraph, highlighting key details such as author, tweet content, and location.
+
+### Example output with tweets:
+
+- **Tweet 1**: Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai, Date: 2025-02-02
+- **Tweet 2**: Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu, Date: 2025-02-03
+
 After the output, include the source link(s) where the information was obtained.
 
 **Source(s):**
-{sources}
+- [Source Link 1](url1)
+- [Source Link 2](url2)
 
-If the results include tweets, format them as follows:
-1. For **multiple tweets**, present them in a list format (as shown in the list example).
-2. For **a single tweet**, summarize the tweet’s content in a paragraph, highlighting key details such as author, tweet content, and location.
+If the content is from internal sources (retriever or similar), mark it as **Internal Source**.
 
-Example output with tweets:
+**Source(s):**
+- [Internal Source](internal-source-url) (Internal Source)
 
-- **Tweet 1**: Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai, Date: 2025-02-02
-- **Tweet 2**: Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu, Date: 2025-02-03                                                                                                  
 """
 )
 
@@ -81,6 +94,50 @@ format_tool = Tool(
 async def search(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
 ) -> Optional[list[dict[str, Any]]]:
+    """Search for general web results from trusted sites.
+
+    This function performs a web search using Tavily's API without LangChain.
+    """
+    load_dotenv()
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    url = "https://api.tavily.com/search"
+
+    params = {
+        "api_key": tavily_key,
+        "query": query,
+        "search_depth": "advanced",
+        "include_domains": [
+            "mausam.imd.gov.in",
+            "aws.imd.gov.in",
+            "beta-tnsmart.rimes.int",
+            "incois.gov.in",
+        ],
+        "exclude_domains": [
+            "weatherapi.com",
+            "weathertab.com",
+            "weather2travel.com",
+            "world-weather.info",
+            "weather-atlas.com",
+            "weather25",
+            "en.climate-data.org",
+            "wisemeteo.com",
+            "easeweather.com",
+        ],
+        "max_results": 5,
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, params=params)
+
+        if response.status_code == 200:
+            return response.json().get("results", [])  # Extract only results
+        else:
+            return [{"error": f"Failed to fetch results: {response.status_code}"}]
+
+
+async def search_old(
+    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg]
+) -> Optional[list[dict[str, Any]]]:
     """Search for general web results from specific trusted sites like IMD,INCOIS,Tnsmart
 
     This function performs a search using the Tavily search engine, which is designed
@@ -94,7 +151,7 @@ async def search(
         "search_depth": "advanced",
         "include_domains": [
             "mausam.imd.gov.in",
-            "aws.imd.gov.in",
+            "city.imd.gov.in" "aws.imd.gov.in",
             "beta-tnsmart.rimes.int",
         ],
         "exclude_domains": [
@@ -197,4 +254,4 @@ async def twitter_search_tool(query: str) -> str:
     return "\n\n".join(formatted_tweets)
 
 
-TOOLS: List[Callable[..., Any]] = [search, retrieve, format_tool]
+TOOLS: List[Callable[..., Any]] = [search, retrieve, twitter_search_tool, format_tool]

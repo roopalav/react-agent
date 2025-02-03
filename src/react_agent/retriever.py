@@ -7,11 +7,18 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PlaywrightURLLoader
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, WebBaseLoader
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    Docx2txtLoader,
+    WebBaseLoader,
+)
 import pandas as pd
+from datetime import datetime
+
 
 class VectorStoreManager:
     """Singleton class to manage the vector store initialization and retrieval."""
+
     _instance = None
 
     def __new__(cls):
@@ -24,16 +31,22 @@ class VectorStoreManager:
         """Initialize the vector store only once."""
         print("Initializing vector store...")
         embedding = OpenAIEmbeddings()
+        current_date = datetime.now().strftime("%d_%m_%Y")
+        trop_url = "https://mausam.imd.gov.in/backend/assets/cyclone_pdf/Tropical_Weather_Outlook_based_on_0300_UTC_of_23_01_2025.pdf"
+        modified_url = trop_url.replace("23_01_2025", current_date)
 
         urls = [
             "https://mausam.imd.gov.in/chennai/mcdata/fishermen.pdf",
             "https://mausam.imd.gov.in/chennai/mcdata/daily_weather_report.pdf",
-            "https://mausam.imd.gov.in/backend/assets/cyclone_pdf/Tropical_Weather_Outlook_based_on_0300_UTC_of_23_01_2025.pdf"
+            modified_url,
         ]
 
         documents = self._load_documents_from_urls(urls)
         cleaned_documents = [
-            Document(page_content=self._clean_document_content(doc.page_content), metadata=doc.metadata)
+            Document(
+                page_content=self._clean_document_content(doc.page_content),
+                metadata=doc.metadata,
+            )
             for doc in documents
         ]
         split_documents_list = self._split_documents(cleaned_documents)
@@ -61,7 +74,11 @@ class VectorStoreManager:
                 loader = PyPDFLoader(pdf_path)
                 docs.extend(loader.load())
             else:
-                loader = PlaywrightURLLoader(url) if url.startswith("https://city.imd.gov.in") else WebBaseLoader(url)
+                loader = (
+                    PlaywrightURLLoader(url)
+                    if url.startswith("https://city.imd.gov.in")
+                    else WebBaseLoader(url)
+                )
                 docs.extend(loader.load())
         return docs
 
@@ -72,12 +89,15 @@ class VectorStoreManager:
             doc_content = soup.get_text()
         return doc_content.replace("\n", " ").replace("\r", " ").strip()
 
-    def _split_documents(self, documents: List[Document], chunk_size=500, chunk_overlap=0) -> List[Document]:
+    def _split_documents(
+        self, documents: List[Document], chunk_size=500, chunk_overlap=0
+    ) -> List[Document]:
         """Split documents into smaller chunks."""
         text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         return text_splitter.split_documents(documents)
+
 
 # Ensure the vector store is initialized at import time
 vector_store_manager = VectorStoreManager()
