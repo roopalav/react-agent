@@ -16,9 +16,8 @@ from react_agent.state import InputState, State
 from react_agent.tools import TOOLS
 from react_agent.utils import load_chat_model
 
+
 # Define the function that calls the model
-
-
 async def call_model(
     state: State, config: RunnableConfig
 ) -> Dict[str, List[AIMessage]]:
@@ -67,7 +66,6 @@ async def call_model(
 
 
 # Define a new graph
-
 builder = StateGraph(State, input=InputState, config_schema=Configuration)
 
 # Define the two nodes we will cycle between

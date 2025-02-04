@@ -23,11 +23,9 @@ import httpx
 
 structured_prompt = PromptTemplate.from_template(
     """
-You are a structured assistant. Format the following response according to its type (table, list, or paragraph or any).
+You are a structured assistant. Format the  response according to its type (table, list, or paragraph or any).
 
 ### Add meaningful title
-
-{content}
 
 If the response contains tabular data, present it as a table with proper column headers and values.
 
@@ -54,16 +52,6 @@ Examples:
 3. For a paragraph:
    The latest weather report shows **Misty Haze** for February 2, 2025, with temperatures reaching 32°C, which is expected to stay consistent into February 3, 2025. No significant rainfall is expected in this region.
 
-If the results include tweets, format them as follows:
-
-- For **multiple tweets**, present them in a list format (as shown in the list example).
-- For **a single tweet**, summarize the tweet’s content in a paragraph, highlighting key details such as author, tweet content, and location.
-
-### Example output with tweets:
-
-- **Tweet 1**:Date: 2025-02-02, Author ID: 123456789, Tweet: "Sample tweet", Location: Madhurai 
-- **Tweet 2**:Date: 2025-02-03, Author ID: 987654321, Tweet: "Another tweet", Location: Chennai, Tamil Nadu
-
 After the output, include the source link(s) where the information was obtained.
 
 **Source(s)**:
@@ -81,9 +69,7 @@ If the content is from internal sources (retriever or similar), mark it as **Int
 
 def format_response(input_data: dict) -> str:
     """Formats responses into structured headings and bullet points."""
-    content = input_data.get("content", "")
-    return structured_prompt.format(content=content)
-    # return structured_prompt.format(**input_data)
+    return structured_prompt.format(**input_data)
 
 
 format_tool = Tool(
@@ -132,7 +118,7 @@ async def search(
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, params=params, headers=headers)
+        response = await client.post(url, json=params, headers=headers)
 
         # Check if the response is successful
         if response.status_code == 200:
@@ -224,16 +210,16 @@ async def twitter_search_tool(query: str) -> str:
 
     url = "https://api.twitter.com/2/tweets/search/recent"
     headers = {"Authorization": f"Bearer {bearer_token}"}
-    params = {
+    querystring = {
         "query": query,
         "max_results": 10,
-        "tweet.fields": "id,created_at,author_id,text,geo",
+        "tweet.fields": ["id,created_at,author_id,text,geo"],
         "expansions": "geo.place_id",
-        "place.fields": "full_name,country",
+        "place.fields": ["full_name,country"],
         "user.fields": "location",
     }
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=querystring)
     if response.status_code != 200:
         return f"Error: {response.status_code}, {response.json()}"
 
@@ -281,4 +267,4 @@ async def twitter_search_tool(query: str) -> str:
     return "\n\n".join(formatted_tweets)
 
 
-TOOLS: List[Callable[..., Any]] = [search, retrieve, twitter_search_tool, format_tool]
+TOOLS: List[Callable[..., Any]] = [search, retrieve]
