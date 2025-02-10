@@ -94,9 +94,10 @@ async def search(
         "query": query,
         "include_domains": [
             "mausam.imd.gov.in",
-            "aws.imd.gov.in",
+            "cmwssb.tn.gov.in",
             "beta-tnsmart.rimes.int",
             "incois.gov.in",
+            "city.imd.gov.in",
         ],
         "exclude_domains": [
             "weatherapi.com",
@@ -164,7 +165,8 @@ async def search_old(
         "search_depth": "advanced",
         "include_domains": [
             "mausam.imd.gov.in",
-            "city.imd.gov.in" "aws.imd.gov.in",
+            "city.imd.gov.in",
+            "aws.imd.gov.in",
             "beta-tnsmart.rimes.int",
         ],
         "exclude_domains": [
